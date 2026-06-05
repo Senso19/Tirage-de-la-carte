@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dix'9 Poker Club — Tirage Officiel</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    min-height:100vh; height:100vh;
+    background: radial-gradient(ellipse 120% 80% at 50% 0%, #1c0000 0%, #0d0d0d 40%, #050505 100%);
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:space-between;
+    padding: 18px 0 22px;
+    font-family: Georgia, serif;
+    overflow:hidden; position:relative;
+  }
+
+  canvas#lights {
+    position:fixed; inset:0; width:100%; height:100%;
+    pointer-events:none; z-index:1;
+  }
+
+  #flash-overlay {
+    position:fixed; inset:0; z-index:999; pointer-events:none;
+    opacity:0;
+  }
+
+  /* ── BLOC 1 : Logo + sous-titre ── */
+  #bloc-logo { display:flex; flex-direction:column; align-items:center; gap:6px; z-index:10; }
+  #bloc-logo svg { filter: drop-shadow(0 2px 24px #cc000066); }
+  #sous-titre { font-size:10px; letter-spacing:6px; color:#cc1111bb; font-family:sans-serif; text-transform:uppercase; }
+
+  /* ── BLOC 2 : Carte + nom ── */
+  #bloc-carte { display:flex; flex-direction:column; align-items:center; gap:10px; z-index:10; position:relative; }
+
+  #halo {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:0; height:0; border-radius:50%; pointer-events:none;
+    transition: width .4s, height .4s;
+  }
+
+  #card {
+    width:220px; height:316px; border-radius:18px;
+    background:linear-gradient(160deg,#fff 60%,#f8f3f3 100%);
+    border:3px solid #ddd;
+    box-shadow: 0 14px 44px #000b, 0 2px 8px #0005;
+    display:flex; flex-direction:column;
+    padding:14px 12px; position:relative; overflow:hidden;
+    transition: box-shadow .4s, border .3s;
+  }
+  #card .shine {
+    position:absolute; top:0; left:0; right:0; height:38%;
+    background:linear-gradient(to bottom,rgba(255,255,255,.65),transparent);
+    border-radius:18px 18px 0 0; pointer-events:none;
+  }
+  #card .corner-top { line-height:1; margin-bottom:4px; }
+  #card .corner-bot { line-height:1; margin-top:4px; transform:rotate(180deg); }
+  #card .val { font-family:Georgia,serif; font-weight:900; font-size:62px; line-height:1; }
+  #card .sym-small { font-size:22px; line-height:1; }
+  #card .sym-center { flex:1; display:flex; align-items:center; justify-content:center; font-size:100px; line-height:1; }
+
+  #card-name {
+    font-size:13px; font-weight:700; letter-spacing:3px;
+    font-family:sans-serif; color:#cc111155;
+    min-height:22px; transition:all .4s; text-align:center;
+  }
+
+  /* ── BLOC 3 : Banner / Marquee ── */
+  #bloc-banner { z-index:10; min-height:60px; display:flex; align-items:center; justify-content:center; width:100%; }
+
+  #banner-gagnant {
+    background:linear-gradient(135deg,#2a0000,#180000,#2a0000);
+    border:2px solid #cc1111; border-radius:50px;
+    padding:12px 36px; display:none; align-items:center; gap:12px;
+    animation: glow-red 1.6s ease-in-out infinite;
+  }
+  #banner-gagnant span.txt {
+    font-size:13px; font-weight:900; letter-spacing:5px;
+    font-family:sans-serif; color:#ff4444;
+    text-shadow:0 0 20px #cc1111;
+  }
+  #banner-gagnant .star { font-size:18px; color:#cc1111; display:inline-block; }
+  .star-l { animation: star-spin 1.3s linear infinite; }
+  .star-r { animation: star-spin 2s linear infinite reverse; }
+
+  #marquee-wrap {
+    width:100vw; overflow:hidden; height:94px; display:none; align-items:center;
+    -webkit-mask-image:linear-gradient(to right,transparent,black 12%,black 88%,transparent);
+    mask-image:linear-gradient(to right,transparent,black 12%,black 88%,transparent);
+  }
+  #marquee-track {
+    display:flex; gap:10px;
+    animation:marquee 1.6s linear infinite;
+    width:max-content;
+  }
+  .mini-card {
+    width:80px; height:114px; border-radius:7px;
+    background:#fff; border:2px solid #ddd;
+    box-shadow:0 4px 12px #0008;
+    display:flex; flex-direction:column;
+    padding:5px; opacity:.55; flex-shrink:0;
+  }
+  .mini-card .mv { font-family:Georgia,serif; font-weight:900; font-size:14px; line-height:1; }
+  .mini-card .ms { font-size:9px; line-height:1; }
+  .mini-card .mc { flex:1; display:flex; align-items:center; justify-content:center; font-size:38px; line-height:1; }
+
+  /* ── BLOC 4 : Compteur + Bouton ── */
+  #bloc-btn { display:flex; flex-direction:column; align-items:center; gap:10px; z-index:10; }
+  #draw-count { font-size:10px; color:#cc111155; letter-spacing:3px; font-family:sans-serif; min-height:14px; }
+
+  #btn {
+    padding:15px 52px; font-size:12px; font-weight:900;
+    letter-spacing:4px; font-family:sans-serif; text-transform:uppercase;
+    border:none; border-radius:50px; cursor:pointer;
+    background:linear-gradient(90deg,#cc1111,#880000,#cc1111,#ff3333,#cc1111);
+    background-size:300% auto;
+    color:#fff;
+    animation:shimmer-btn 2s linear infinite;
+    box-shadow:0 4px 40px #cc111177, 0 0 0 1px #cc111144;
+    text-shadow:0 1px 6px #00000088;
+    transition:all .3s;
+  }
+
+  #deco-bas { position:fixed; bottom:6px; z-index:5; font-size:14px; color:#cc111133; letter-spacing:10px; }
+
+  /* ── Animations ── */
+  @keyframes card-winner {
+    0%,100%{ transform:scale(1) translateY(0); }
+    50%    { transform:scale(1.06) translateY(-12px); }
+  }
+  @keyframes spin-flip {
+    0%  { transform:rotateY(-9deg) scaleX(.88); opacity:.6; }
+    50% { transform:rotateY(0deg)  scaleX(1);   opacity:1;  }
+    100%{ transform:rotateY(9deg)  scaleX(.88); opacity:.6; }
+  }
+  @keyframes float {
+    0%,100%{ transform:translateY(0); }
+    50%    { transform:translateY(-6px); }
+  }
+  @keyframes marquee { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  @keyframes shimmer-btn { 0%{background-position:-200% center} 100%{background-position:200% center} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes glow-red {
+    0%,100%{ box-shadow:0 0 30px #cc111188,0 0 60px #cc111144; }
+    50%    { box-shadow:0 0 80px #cc1111cc,0 0 160px #cc111188; }
+  }
+  @keyframes star-spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  @keyframes halo-pulse {
+    0%,100%{ transform:translate(-50%,-50%) scale(1);   opacity:.5; }
+    50%    { transform:translate(-50%,-50%) scale(1.18); opacity:.9; }
+  }
+  @keyframes screen-flash {
+    0%  { background:rgba(255,255,255,.95); opacity:1; }
+    8%  { background:rgba(255,255,255,0);   opacity:1; }
+    16% { background:rgba(204,17,17,.85);   opacity:1; }
+    24% { background:rgba(204,17,17,0);     opacity:1; }
+    32% { background:rgba(255,255,255,.7);  opacity:1; }
+    40% { background:rgba(255,255,255,0);   opacity:1; }
+    50% { background:rgba(204,17,17,.5);    opacity:1; }
+    60% { background:rgba(204,17,17,0);     opacity:1; }
+    72% { background:rgba(255,255,255,.3);  opacity:1; }
+    100%{ background:rgba(255,255,255,0);   opacity:0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="lights"></canvas>
+<div id="flash-overlay"></div>
+
+<!-- BLOC 1 -->
+<div id="bloc-logo">
+  <svg width="260" height="90" viewBox="0 0 320 110">
+    <text x="8"   y="48"  font-family="Arial Black,sans-serif" font-weight="900" font-size="46" fill="#888" letter-spacing="2">DIX'9</text>
+    <line x1="168" y1="30" x2="316" y2="30" stroke="#555" stroke-width="1.5"/>
+    <text x="6"   y="98"  font-family="Arial Black,sans-serif" font-weight="900" font-size="56" fill="#cc1111">P</text>
+    <text x="60"  y="100" font-family="serif" font-size="54" fill="white" stroke="white" stroke-width="0.5">♠</text>
+    <text x="114" y="98"  font-family="Arial Black,sans-serif" font-weight="900" font-size="56" fill="#cc1111">K</text>
+    <text x="172" y="100" font-family="serif" font-size="54" fill="white" stroke="white" stroke-width="0.5">♣</text>
+    <text x="232" y="98"  font-family="Arial Black,sans-serif" font-weight="900" font-size="56" fill="#cc1111">R</text>
+    <line x1="4"   y1="104" x2="270" y2="104" stroke="#555" stroke-width="1.5"/>
+    <text x="236" y="110" font-family="Arial,sans-serif" font-weight="400" font-size="18" fill="#888" letter-spacing="5">CLUB</text>
+  </svg>
+  <div id="sous-titre">✦ &nbsp; Tirage Officiel &nbsp; ✦</div>
+</div>
+
+<!-- BLOC 2 -->
+<div id="bloc-carte">
+  <div id="halo"></div>
+  <div id="card">
+    <div class="shine"></div>
+    <div class="corner-top">
+      <div class="val" id="val-top">A</div>
+      <div class="sym-small" id="sym-top">♠</div>
+    </div>
+    <div class="sym-center" id="sym-center">♠</div>
+    <div class="corner-bot">
+      <div class="val" id="val-bot">A</div>
+      <div class="sym-small" id="sym-bot">♠</div>
+    </div>
+  </div>
+  <div id="card-name">52 cartes · 1 gagnant</div>
+</div>
+
+<!-- BLOC 3 -->
+<div id="bloc-banner">
+  <div id="banner-gagnant">
+    <span class="star star-l">✦</span>
+    <span class="star star-r">✦</span>
+    <span class="txt">CARTE GAGNANTE</span>
+    <span class="star star-l">✦</span>
+    <span class="star star-r">✦</span>
+  </div>
+  <div id="marquee-wrap">
+    <div id="marquee-track"></div>
+  </div>
+</div>
+
+<!-- BLOC 4 -->
+<div id="bloc-btn">
+  <div id="draw-count"></div>
+  <button id="btn" onclick="handleClick()">🎰 &nbsp; Lancer le Tirage</button>
+</div>
+
+<div id="deco-bas">♠ ♥ ♦ ♣</div>
+
+<script>
+const SUITS = [
+  { name:"Coeur",   sym:"♥", color:"#CC1111" },
+  { name:"Carreau", sym:"♦", color:"#CC1111" },
+  { name:"Pique",   sym:"♠", color:"#111" },
+  { name:"Trefle",  sym:"♣", color:"#111" },
+];
+const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+const VALUE_FULL = { A:"As", J:"Valet", Q:"Dame", K:"Roi" };
+const DECK = SUITS.flatMap(s => VALUES.map(v => ({ v, s })));
+
+let phase = "idle"; // idle | spinning | slowing | winner
+let winner = null;
+let drawCount = 0;
+let loopTimer = null;
+
+// ── Affiche une carte ──
+function showCard(card, isWinner=false, isSpinning=false) {
+  const col = card.s.color;
+  document.getElementById("val-top").textContent   = card.v;
+  document.getElementById("val-bot").textContent   = card.v;
+  document.getElementById("sym-top").textContent   = card.s.sym;
+  document.getElementById("sym-bot").textContent   = card.s.sym;
+  document.getElementById("sym-center").textContent = card.s.sym;
+  ["val-top","val-bot","sym-top","sym-bot","sym-center"].forEach(id => {
+    document.getElementById(id).style.color = col;
+  });
+
+  const cardEl = document.getElementById("card");
+  cardEl.style.border = isWinner ? "4px solid #cc1111" : "3px solid #ddd";
+  cardEl.style.boxShadow = isWinner
+    ? "0 0 0 6px #cc111133,0 0 70px #cc1111cc,0 0 140px #cc111166,0 14px 50px #000d"
+    : isSpinning
+    ? "0 0 50px #ffffff44,0 8px 32px #000a"
+    : "0 14px 44px #000b,0 2px 8px #0005";
+
+  const nameEl = document.getElementById("card-name");
+  if (isWinner) {
+    nameEl.style.fontSize   = "20px";
+    nameEl.style.color      = col === "#CC1111" ? "#ff7777" : "#ccccff";
+    nameEl.style.animation  = "fadeUp .5s ease-out";
+    nameEl.textContent = `${VALUE_FULL[card.v]||card.v} de ${card.s.name}`;
+  } else if (isSpinning) {
+    nameEl.style.fontSize   = "13px";
+    nameEl.style.color      = "#cc111155";
+    nameEl.style.animation  = "none";
+    nameEl.textContent = `${VALUE_FULL[card.v]||card.v} de ${card.s.name}`;
+  } else {
+    nameEl.textContent = "52 cartes · 1 gagnant";
+    nameEl.style.color = "#cc111155";
+    nameEl.style.fontSize = "13px";
+  }
+}
+
+function randCard() { return DECK[Math.floor(Math.random()*52)]; }
+
+// ── Boucle infinie ──
+function spinLoop() {
+  showCard(randCard(), false, true);
+  document.getElementById("card").style.animation = "spin-flip 0.13s ease-in-out infinite";
+  loopTimer = setTimeout(spinLoop, 60);
+}
+
+// ── Ralentissement ──
+function slowDown(step) {
+  const total = 55;
+  if (step >= total) {
+    clearTimeout(loopTimer);
+    showCard(winner, true, false);
+    document.getElementById("card").style.animation = "card-winner 2s ease-in-out infinite";
+    setPhaseWinner();
+    return;
+  }
+  const p = step / total;
+  const delay = 40 + Math.pow(p, 2.4) * 580;
+  showCard(randCard(), false, true);
+  loopTimer = setTimeout(() => slowDown(step+1), delay);
+}
+
+function setPhaseWinner() {
+  phase = "winner";
+  document.getElementById("banner-gagnant").style.display = "flex";
+  document.getElementById("marquee-wrap").style.display   = "none";
+  document.getElementById("halo").style.cssText = `
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:360px;height:360px;border-radius:50%;
+    background:radial-gradient(circle,#cc111166 0%,#cc111122 40%,transparent 70%);
+    animation:halo-pulse 1.8s ease-in-out infinite;
+    pointer-events:none;
+  `;
+  document.getElementById("btn").textContent = "🔄  Nouveau Tirage";
+
+  // Flash écran
+  const fl = document.getElementById("flash-overlay");
+  fl.style.animation = "none";
+  fl.offsetHeight; // reflow
+  fl.style.animation = "screen-flash 2s ease-out forwards";
+}
+
+// ── Clic bouton ──
+function handleClick() {
+  if (phase === "idle" || phase === "winner") {
+    // 1er clic — démarrage
+    clearTimeout(loopTimer);
+    winner = randCard();
+    drawCount++;
+    phase = "spinning";
+    document.getElementById("draw-count").textContent = `TIRAGE #${drawCount}`;
+    document.getElementById("banner-gagnant").style.display = "none";
+    document.getElementById("marquee-wrap").style.display   = "flex";
+    document.getElementById("halo").style.cssText = `
+      position:absolute;top:50%;left:50%;
+      transform:translate(-50%,-50%);
+      width:280px;height:280px;border-radius:50%;
+      background:radial-gradient(circle,#ffffff18 0%,transparent 60%);
+      pointer-events:none;
+    `;
+    document.getElementById("btn").textContent = "🛑  Arrêter le tirage";
+    startLights();
+    spinLoop();
+  } else if (phase === "spinning") {
+    // 2e clic — déclenche le ralentissement
+    phase = "slowing";
+    clearTimeout(loopTimer);
+    slowDown(0);
+  }
+}
+
+// ── Éclairages disco canvas ──
+const canvas  = document.getElementById("lights");
+const ctx     = canvas.getContext("2d");
+let lightsRAF = null;
+let t = 0;
+const LIGHTS = [
+  { x:.08,  angle: .20, speed:.0018, sweep:.50, col:"#cc1111", width:.060, phase:0.0 },
+  { x:.22,  angle:-.10, speed:.0024, sweep:.42, col:"#ffffff", width:.040, phase:1.2 },
+  { x:.38,  angle: .40, speed:.0020, sweep:.55, col:"#cc1111", width:.055, phase:2.5 },
+  { x:.52,  angle:-.30, speed:.0015, sweep:.48, col:"#ffffff", width:.050, phase:0.8 },
+  { x:.65,  angle: .30, speed:.0022, sweep:.52, col:"#cc1111", width:.050, phase:3.1 },
+  { x:.80,  angle:-.20, speed:.0017, sweep:.45, col:"#ffffff", width:.045, phase:1.7 },
+  { x:.93,  angle: .50, speed:.0021, sweep:.50, col:"#cc1111", width:.040, phase:2.2 },
+];
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+function drawLights() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  LIGHTS.forEach(l => {
+    const osc   = Math.sin(t * l.speed * Math.PI * 2 + l.phase);
+    const angle = l.angle + osc * l.sweep;
+    const sx = l.x * W, sy = 0;
+    const len = H * 1.1;
+    const ex  = sx + Math.sin(angle)*len;
+    const ey  = sy + Math.cos(angle)*len;
+    const hw  = l.width * W;
+    const dx  = ex-sx, dy = ey-sy, d = Math.sqrt(dx*dx+dy*dy);
+    const nx  = -dy/d, ny = dx/d;
+    const g = ctx.createLinearGradient(sx,sy,ex,ey);
+    g.addColorStop(0,   l.col+"dd");
+    g.addColorStop(.3,  l.col+"88");
+    g.addColorStop(.7,  l.col+"33");
+    g.addColorStop(1,   l.col+"00");
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(sx-nx*2,    sy-ny*2);
+    ctx.lineTo(sx+nx*2,    sy+ny*2);
+    ctx.lineTo(ex+nx*hw,   ey+ny*hw);
+    ctx.lineTo(ex-nx*hw,   ey-ny*hw);
+    ctx.closePath();
+    ctx.fillStyle = g;
+    ctx.globalCompositeOperation = "screen";
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    const sg = ctx.createRadialGradient(sx,4,0,sx,4,18);
+    sg.addColorStop(0, l.col+"ff");
+    sg.addColorStop(1, l.col+"00");
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sx,4,18,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+  t++;
+  lightsRAF = requestAnimationFrame(drawLights);
+}
+
+function startLights() {
+  if (lightsRAF) return;
+  drawLights();
+}
+
+// Marquee init
+function buildMarquee() {
+  const track = document.getElementById("marquee-track");
+  const cards = Array.from({length:32}, () => randCard());
+  track.innerHTML = cards.map(c => `
+    <div class="mini-card">
+      <div class="mv" style="color:${c.s.color}">${c.v}</div>
+      <div class="ms" style="color:${c.s.color}">${c.s.sym}</div>
+      <div class="mc" style="color:${c.s.color}">${c.s.sym}</div>
+    </div>
+  `).join("");
+}
+buildMarquee();
+
+// Carte initiale
+showCard(DECK[0]);
+document.getElementById("card").style.animation = "float 3s ease-in-out infinite";
+</script>
+</body>
+</html>
